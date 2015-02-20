@@ -39,5 +39,4 @@ class mysql::server::backup (
       'execpath'           => $execpath,
     }
   })
-
 }
