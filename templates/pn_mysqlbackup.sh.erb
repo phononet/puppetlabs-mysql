@@ -1,0 +1,84 @@
+#!/bin/bash
+#
+# MySQL Backup Script
+#  Dumps mysql databases to a file for another backup tool to pick up.
+#
+# MySQL code:
+# GRANT SELECT, RELOAD, LOCK TABLES ON *.* TO 'user'@'localhost'
+# IDENTIFIED BY 'password';
+# FLUSH PRIVILEGES;
+#
+##### START CONFIG ###################################################
+
+USER="<%= @backupuser %>"
+PASS="<%= @backuppassword %>"
+DATABASES=( <% @backupdatabases.each do |database| -%>"<%= database %>" <% end -%>)
+DIR=<%= @backupdir %>
+MYSQLOPTS="<% @mysqlopts.each do |opts| -%><%= opts %> <% end -%>"
+KEEPDUMP=<%= @backuprotate %>
+FILE_PREFIX="<%= @fileprefix %>"
+
+##### STOP CONFIG ####################################################
+PATH=/usr/bin:/usr/sbin:/bin:/sbin
+GREEN='32m'
+RED='31m'
+
+usage(){
+  echo ""
+  echo "$0 [ -p <string> ] [ -D ] [ -h ]"
+  echo ""
+  echo " -p <string>          : Save dumpfile with given prefix."
+  echo " -D                   : Create dump with no data."
+  echo " -h                   : Help"
+  echo ""
+  exit 0
+}
+
+while getopts :p:Dh option
+do
+  case "$option" in
+    "p")
+      FILE_PREFIX="$OPTARG"
+    ;;
+    "D")
+      MYSQLOPTS="--no-data $MYSQLOPTS"
+    ;;
+    "h")
+      usage
+    ;;
+     \?) echo "Ungültige Option: $OPTARG"
+    ;;
+     :) echo "Fehlendes Argument bei Option $OPTARG"
+    ;;
+  esac
+done
+
+LOG(){
+  EXIT_CODE=$?
+  DATE=$( date "+%F %H:%M:%S" )
+  if [[ $EXIT_CODE == 0 ]] ; then
+    echo -en "$1 "'\E['"${GREEN}SUCCESS" ; echo -e '\E[0m'
+    logger "mysql-backup: $1: SUCCESS"
+  else
+    echo -en "$1 "'\E['"${RED}FAILD" ; echo -e '\E[0m'
+    logger "mysql-backup: $1: FAILD"
+    exit $EXIT_CODE
+  fi
+}
+
+find $DIR -name "$FILE_PREFIX*" -mtime +$KEEPDUMP -exec rm -f {} \;
+LOG "[Find] Remove old Backups"
+
+for db in ${DATABASES[@]} ; do
+  DATE=$( date +%Y%m%d-%H%M%S )
+  FILE="${FILE_PREFIX}-${db}-${DATE}.sql"
+
+  [[ ! -z "$db" ]] || db="--all-databases"
+
+  mysqldump -u${USER} -p${PASS} ${MYSQLOPTS} ${db} \
+    <% if backupcompress %>| gzip - -c <% end %>> ${DIR}/${FILE}<% if backupcompress %>.gz<% end  %>
+  LOG "[Mysqldump] Create ${DIR}/${FILE}<% if backupcompress %>.gz<% end  %>"
+done
+
+chmod 440 ${DIR}/${FILE_PREFIX}*
+LOG "[Chmod] Set read-only permission"
