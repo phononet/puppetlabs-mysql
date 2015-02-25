@@ -23,11 +23,15 @@ class mysql::server::config {
 
   if $logbin {
     $logbindir = mysql_dirname($logbin)
-    file { $logbindir:
-      ensure => directory,
-      mode   => '0755',
-      owner  => $options['mysqld']['user'],
-      group  => $options['mysqld']['user'],
+    
+    #Stop puppet from managing directory if just a filename/prefix is specified
+    if $logbindir != '.' {
+      file { $logbindir:
+        ensure => directory,
+        mode   => '0755',
+        owner  => $options['mysqld']['user'],
+        group  => $options['mysqld']['user'],
+      }
     }
   }
 
