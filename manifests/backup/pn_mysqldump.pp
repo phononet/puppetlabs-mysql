@@ -7,7 +7,7 @@ class mysql::backup::pn_mysqldump (
   $backupdirowner     = 'root',
   $backupdirgroup     = 'root',
   $backupcompress     = true,
-  $backuprotate       = 30,
+  $backuprotate       = 7,
   $ignore_events      = true,
   $delete_before_dump = false,
   $backupdatabases    = [],
@@ -38,7 +38,7 @@ class mysql::backup::pn_mysqldump (
 
   cron { 'mysql-backup':
     ensure  => $ensure,
-    command => '/usr/local/sbin/mysqlbackup.sh',
+    command => '/usr/local/sbin/mysqlbackup.sh > /dev/null',
     user    => 'root',
     hour    => $time[0],
     minute  => $time[1],
