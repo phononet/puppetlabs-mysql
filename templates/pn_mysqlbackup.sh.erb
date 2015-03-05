@@ -72,11 +72,11 @@ LOG(){
 
   if [[ $EXIT_CODE != 0 ]] ; then
     echo -en "$log_message "'\E['"${RED}FAILD" ; echo -e '\E[0m'
-    logger "mysql-backup: $log_message: FAILD"
+    logger "mysql-backup: $log_message FAILD"
     return $EXIT_CODE
   fi
   echo -en "$log_message "'\E['"${GREEN}SUCCESS" ; echo -e '\E[0m'
-  logger "mysql-backup: $log_message: SUCCESS"
+  logger "mysql-backup: $log_message SUCCESS"
 }
 
 create_mysql_dump(){
