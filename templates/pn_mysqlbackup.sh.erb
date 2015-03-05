@@ -10,38 +10,50 @@
 #
 ##### START CONFIG ###################################################
 
-USER="<%= @backupuser %>"
-PASS="<%= @backuppassword %>"
+MYSQL_USER="<%= @backupuser %>"
+MYSQL_PASS="<%= @backuppassword %>"
 DATABASES=( <% @backupdatabases.each do |database| -%>"<%= database %>" <% end -%>)
 DIR=<%= @backupdir %>
 MYSQLOPTS="<% @mysqlopts.each do |opts| -%><%= opts %> <% end -%>"
-KEEPDUMP=<%= @backuprotate %>
+ROTATE=<%= @backuprotate %>
 FILE_PREFIX="<%= @fileprefix %>"
 
+CREATE_SLAVE="false"
 ##### STOP CONFIG ####################################################
 PATH=/usr/bin:/usr/sbin:/bin:/sbin
 GREEN='32m'
 RED='31m'
 
+set -o pipefail
+
 usage(){
   echo ""
-  echo "$0 [ -p <string> ] [ -D ] [ -h ]"
+  echo "$0 [ -p <string> ] [ -D ] [-s] [ -h ]"
   echo ""
-  echo " -p <string>          : Save dumpfile with given prefix."
-  echo " -D                   : Create dump with no data."
+  echo " -p <string>          : Save dumpfile with given prefix"
+  echo " -D                   : Create dump with no data"
+  echo " -s                   : Create dump for slave server with master-data=2 option"
+  echo " -u                   : Use different mysql user"
   echo " -h                   : Help"
   echo ""
   exit 0
 }
 
-while getopts :p:Dh option
+while getopts :P:u:Dsh option
 do
   case "$option" in
-    "p")
+    "P")
       FILE_PREFIX="$OPTARG"
     ;;
     "D")
       MYSQLOPTS="--no-data $MYSQLOPTS"
+    ;;
+    "s")
+      CREATE_SLAVE="true"
+    ;;
+    "u")
+      MYSQL_USER="$OPTARG"
+      MYSQL_PASS=""
     ;;
     "h")
       usage
@@ -55,30 +67,49 @@ done
 
 LOG(){
   EXIT_CODE=$?
+  log_message="$1"
   DATE=$( date "+%F %H:%M:%S" )
-  if [[ $EXIT_CODE == 0 ]] ; then
-    echo -en "$1 "'\E['"${GREEN}SUCCESS" ; echo -e '\E[0m'
-    logger "mysql-backup: $1: SUCCESS"
-  else
-    echo -en "$1 "'\E['"${RED}FAILD" ; echo -e '\E[0m'
-    logger "mysql-backup: $1: FAILD"
-    exit $EXIT_CODE
+
+  if [[ $EXIT_CODE != 0 ]] ; then
+    echo -en "$log_message "'\E['"${RED}FAILD" ; echo -e '\E[0m'
+    logger "mysql-backup: $log_message: FAILD"
+    return $EXIT_CODE
   fi
+  echo -en "$log_message "'\E['"${GREEN}SUCCESS" ; echo -e '\E[0m'
+  logger "mysql-backup: $log_message: SUCCESS"
 }
 
-find $DIR -name "$FILE_PREFIX*" -mtime +$KEEPDUMP -exec rm -f {} \;
-LOG "[Find] Remove old Backups"
+create_mysql_dump(){
+  local _db_opts="$1"
+  local _db="$2"
+  local _date="$( date +%Y%m%d-%H%M%S )"
+  local _file="${FILE_PREFIX}-${_db// /_}-${_date}.sql"
 
-for db in ${DATABASES[@]} ; do
-  DATE=$( date +%Y%m%d-%H%M%S )
-  FILE="${FILE_PREFIX}-${db}-${DATE}.sql"
+  mysqldump -u"${MYSQL_USER}" ${MYSQL_PASS} ${MYSQLOPTS} ${_db_opts} ${_db} \
+    <% if backupcompress %>| gzip - -c <% end %>> "${DIR}"/"${_file}"<% if backupcompress %>.gz<% end  %>
+  LOG "[Mysqldump] Create ${DIR}/${_file}<% if backupcompress %>.gz<% end  %>"
+}
 
-  [[ ! -z "$db" ]] || db="--all-databases"
+cleanup()
+{
+  find "${DIR}/" -maxdepth 1 -type f -name "${FILE_PREFIX}*.sql*" -mtime +${ROTATE} -print0 | xargs -0 -r rm -f
+  LOG "[Find] Remove old Backups"
+}
 
-  mysqldump -u${USER} -p${PASS} ${MYSQLOPTS} ${db} \
-    <% if backupcompress %>| gzip - -c <% end %>> ${DIR}/${FILE}<% if backupcompress %>.gz<% end  %>
-  LOG "[Mysqldump] Create ${DIR}/${FILE}<% if backupcompress %>.gz<% end  %>"
-done
+[[ -z "$MYSQL_PASS" ]] || MYSQL_PASS="-p$MYSQL_PASS"
 
-chmod 440 ${DIR}/${FILE_PREFIX}*
-LOG "[Chmod] Set read-only permission"
+if [[ -z $DATABASES ]] ; then
+  create_mysql_dump "--all-databases"
+elif [[ $CREATE_SLAVE == "true" ]] ; then
+  create_mysql_dump "--master-data=2 --databases" "${DATABASES[*]}"
+elif [[ ! -z $DATABASES ]] ; then
+  for db in ${DATABASES[@]} ; do
+    create_mysql_dump " " "$db"
+  done
+fi
+
+if [[ $EXIT_CODE == 0 ]] ; then
+  cleanup
+fi
+
+exit 0
