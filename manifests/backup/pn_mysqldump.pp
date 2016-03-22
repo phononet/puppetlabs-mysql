@@ -18,6 +18,7 @@ class mysql::backup::pn_mysqldump (
   $execpath           = '/usr/bin:/usr/sbin:/bin:/sbin',
   $template           = 'mysql/pn_mysqlbackup.sh.erb',
   $mysqlopts          = [ '--opt' ],
+  $privileges         = [ 'SELECT', 'RELOAD', 'LOCK TABLES', 'SHOW VIEW', 'PROCESS' ],
   $fileprefix         = 'mysql-dump',
 ) {
 
@@ -32,7 +33,7 @@ class mysql::backup::pn_mysqldump (
     ensure     => $ensure,
     user       => "${backupuser}@localhost",
     table      => '*.*',
-    privileges => [ 'SELECT', 'RELOAD', 'LOCK TABLES', 'SHOW VIEW', 'PROCESS' ],
+    privileges => $privileges,
     require    => Mysql_user["${backupuser}@localhost"],
   }
 
