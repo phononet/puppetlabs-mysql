@@ -10,8 +10,8 @@
 #
 ##### START CONFIG ###################################################
 
-MYSQL_USER="<%= @backupuser %>"
-MYSQL_PASS="<%= @backuppassword %>"
+USER="<%= @backupuser %>"
+PASS="<%= @backuppassword %>"
 DATABASES=( <% @backupdatabases.each do |database| -%>"<%= database %>" <% end -%>)
 DIR=<%= @backupdir %>
 MYSQLOPTS="<% @mysqlopts.each do |opts| -%><%= opts %> <% end -%>"
@@ -28,18 +28,19 @@ set -o pipefail
 
 usage(){
   echo ""
-  echo "$0 [ -p <string> ] [ -D ] [-s] [ -h ]"
+  echo "$0 [ -p <string> ] [ -D ] [-s] [ -h ] [ -d ]"
   echo ""
-  echo " -p <string>          : Save dumpfile with given prefix"
+  echo " -P <string>          : Save dumpfile with given prefix"
   echo " -D                   : Create dump with no data"
   echo " -s                   : Create dump for slave server with master-data=2 option"
   echo " -u                   : Use different mysql user"
+  echo " -d                   : Dump only set database. Can be set multiple times"
   echo " -h                   : Help"
   echo ""
   exit 0
 }
 
-while getopts :P:u:Dsh option
+while getopts :P:u:d:Dsh option
 do
   case "$option" in
     "P")
@@ -52,8 +53,12 @@ do
       CREATE_SLAVE="true"
     ;;
     "u")
-      MYSQL_USER="$OPTARG"
-      MYSQL_PASS=""
+      USER="$OPTARG"
+      PASS=""
+    ;;
+    "d")
+      _database=( ${_database[@]} $OPTARG )
+      DATABASES=( ${_database[@]} )
     ;;
     "h")
       usage
@@ -71,12 +76,12 @@ LOG(){
   DATE=$( date "+%F %H:%M:%S" )
 
   if [[ $EXIT_CODE != 0 ]] ; then
-    echo -en "$log_message "'\E['"${RED}FAILD" ; echo -e '\E[0m'
-    logger "mysql-backup: $log_message FAILD"
+    echo -en '\E['"${RED}ERROR" ; echo -e '\E[0m' " $log_message"
+    logger "mysql-backup: ERROR: $log_message"
     return $EXIT_CODE
   fi
-  echo -en "$log_message "'\E['"${GREEN}SUCCESS" ; echo -e '\E[0m'
-  logger "mysql-backup: $log_message SUCCESS"
+  echo -en '\E['"${GREEN}INFO" ; echo -e '\E[0m' " $log_message"
+  logger "mysql-backup: INFO: $log_message"
 }
 
 create_mysql_dump(){
@@ -85,18 +90,44 @@ create_mysql_dump(){
   local _date="$( date +%Y%m%d-%H%M%S )"
   local _file="${FILE_PREFIX}-${_db// /_}-${_date}.sql"
 
-  mysqldump -u"${MYSQL_USER}" ${MYSQL_PASS} ${MYSQLOPTS} ${_db_opts} ${_db} \
+<% if @ignore_events %>
+  additional_options="--ignore-table=mysql.event"
+<% else %>
+  additional_options="--events"
+<% end %>
+<%# Only include routines or triggers if we're doing a file per database -%>
+<%# backup. This happens if we named databases, or if we explicitly set -%>
+<%# file per database mode -%>
+<% if !@backupdatabases.empty? || @file_per_database -%>
+<% if @include_triggers -%>
+  additional_options="$additional_options --triggers"
+<% else -%>
+  additional_options="$additional_options --skip-triggers"
+<% end -%>
+<% if @include_routines -%>
+  additional_options="$additional_options --routines"
+<% else -%>
+  additional_options="$additional_options --skip-routines"
+<% end -%>
+<% end -%>
+
+  # Create temporary mysql cnf file.
+  TMPFILE=`mktemp /tmp/backup.XXXXXX` || exit 1
+  echo -e "[client]\npassword=$PASS\nuser=$USER" > $TMPFILE
+
+  # Ensure backup directory exist.
+  mkdir -p $DIR
+  mysqldump --defaults-file=$TMPFILE ${MYSQLOPTS} ${additional_options} ${_db_opts} ${_db} \
     <% if backupcompress %>| gzip - -c <% end %>> "${DIR}"/"${_file}"<% if backupcompress %>.gz<% end  %>
-  LOG "[Mysqldump] Create ${DIR}/${_file}<% if backupcompress %>.gz<% end  %>"
+  LOG "Create ${DIR}/${_file}<% if backupcompress %>.gz<% end  %>"
+  rm -f $TMPFILE
 }
 
 cleanup()
 {
   find "${DIR}/" -maxdepth 1 -type f -name "${FILE_PREFIX}*.sql*" -mtime +${ROTATE} -print0 | xargs -0 -r rm -f
-  LOG "[Find] Remove old Backups"
+  LOG "Remove old Backups"
 }
-
-[[ -z "$MYSQL_PASS" ]] || MYSQL_PASS="-p$MYSQL_PASS"
 
 if [[ -z $DATABASES ]] ; then
   create_mysql_dump "--all-databases"
@@ -111,5 +142,11 @@ fi
 if [[ $EXIT_CODE == 0 ]] ; then
   cleanup
 fi
+
+<% if @postscript -%>
+  <%- [@postscript].flatten.compact.each do |script|%>
+<%= script %>
+  <%- end -%>
+<% end -%>
 
 exit 0
