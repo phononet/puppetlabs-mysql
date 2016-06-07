@@ -96,7 +96,7 @@ class mysql::params {
     'Suse': {
       case $::operatingsystem {
         'OpenSuSE': {
-          if versioncmp( $::operatingsystemmajrelease, '13' ) >= 0 {
+          if versioncmp( $::operatingsystemmajrelease, '12' ) >= 0 {
             $client_package_name = 'mariadb-client'
             $server_package_name = 'mariadb'
             # First service start fails if this is set. Runs fine without
@@ -169,7 +169,7 @@ class mysql::params {
       $log_error               = '/var/log/mysql/error.log'
       $pidfile                 = '/var/run/mysqld/mysqld.pid'
       $root_group              = 'root'
-      $mysql_group             = 'mysql'
+      $mysql_group             = 'adm'
       $server_service_name     = 'mysql'
       $socket                  = '/var/run/mysqld/mysqld.sock'
       $ssl_ca                  = '/etc/mysql/cacert.pem'
@@ -432,7 +432,7 @@ class mysql::params {
   }
 
   ## Additional graceful failures
-  if $::osfamily == 'RedHat' and $::operatingsystemmajrelease == '4' {
+  if $::osfamily == 'RedHat' and $::operatingsystemmajrelease == '4' and $::operatingsystem != 'Amazon' {
     fail("Unsupported platform: puppetlabs-${module_name} only supports RedHat 5.0 and beyond")
   }
 }

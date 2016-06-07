@@ -1,3 +1,83 @@
+## Supported Release 3.8.0
+###Summary
+This release adds Percona 5.7 support and compatibility with Ubuntu 16.04, in addition to various bugfixes.
+
+#### Features
+- Adds support for Percona 5.7
+- Adds support for Ubuntu 16.04 (Xenial)
+
+#### Known Limitations
+- The mysqlbackup.sh script will not work on MySQL 5.7.0 and up.
+
+#### Bugfixes
+- Use mysql_install_db only with uniq defaults-extra-file
+- Updates mysqlbackup.sh to ensure backup directory exist
+- Loosen MariaDB recognition to fix it on Debian 8
+- Allow mysql::backup::mysqldump to access root_group in tests
+- Fixed problem with ignoring parameters from global configs
+- Fixes ordering issue that initialized mysqld before config is set
+- (MODULES-1256) Fix parameters on OpenSUSE 12
+- Fixes install errors on Debian-based OS by configuring the base of includedir
+- Configure the configfile location for mariadb
+- Default mysqld_type return value should be 'mysql' if another type is not detected
+- Make sure that bzip2 is installed before setting up the cron tab job using mysqlbackup.sh
+- Fixes path issue on FreeBSD
+- Check that /var/lib/mysql actually contains files
+- Removes mysql regex when checking type
+- (MODULES-2111) Add the system database to user related actions
+- Updates default group for logfiles on Debian-based OS to 'adm'
+- Fixes an issue with Amazon linux major release 4 installation
+- Fixes 'mysql_install_db' script support on Gentoo
+- Removes erroneous anchors to mysql::client from mysql::db
+- Adds path to be able to find MySQL 5.5 installation on CentOS
+
+## Supported Release 3.7.0
+###Summary
+
+A large release with several new features. Also includes a considerable amount of bugfixes, many around compatibility and improvements to current functionality.
+
+#### Features
+
+- Now uses mariadb in OpenSuSE >= 13.1.
+- Switch to rspec-puppet-facts.
+- Additional function to check if table exists before grant.
+- Add ability to input password hash directly.
+- Now checking major release instead of specific release.
+- Debian 8 support.
+
+#### Bugfixes
+
+- Minor doc update.
+- Fixes improper use of function `warn` in backup manifest of server.
+- Fixes to Compatibility with PE 3.3.
+- Fixes `when not managing config file` in `mysql_server_spec`.
+- Improved user validation and munging.
+- Fixes fetching the mysql_user password for MySQL >=5.7.6.
+- Fixes unique server_id within my.cnf, the issue were the entire mac address was not being read in to generate the id.
+- Corrects the daemon_dev_package_name for mariadb on redhat.
+- Fix version compare to properly suppress show_diff for root password.
+- Fixes to ensure compatibility with future parser.
+- Solaris removed from PE in metadata as its not supported.
+- Use MYSQL_PWD to avoid mysqldump warnings.
+- Use temp cnf file instead of env variable which creates acceptance test failures.
+- No longer hash passwords that are already hashed.
+- Fix Gemfile to work with ruby 1.8.7.
+- Fixed MySQL 5.7.6++ compatibility.
+- Fixing error when disabling service management and the service does not exist.
+- Ubuntu vivid should use systemd not upstart.
+- Fixed new mysql_datadir provider on CentOS for MySQl 5.7.6 compatibility.
+- Ensure if service restart to wait till mysql is up.
+- Move all dependencies to not have them in case of service unmanaged.
+- Re-Added the ability to set a empty string as option parameter.
+- Fixes edge-case with dropping pre-existing users with grants.
+- Fix logic for choosing rspec version.
+- Refactored main acceptance suite.
+- Skip idempotency tests on test cells that do have PUP-5016 unfixed.
+- Fix tmpdir to be shared across examples.
+- Update to current msync configs [006831f].
+- Fix mysql_grant with MySQL ANSI_QUOTES mode.
+- Generate .my.cnf for all sections.
+
 ## Supported Release 3.6.2
 ###Summary
 
